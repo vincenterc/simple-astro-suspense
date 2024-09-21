@@ -1,10 +1,26 @@
 import { defineMiddleware } from 'astro/middleware';
 
+type SuspenseChunk = { id: number; chunk: string };
+
 export const onRequest = defineMiddleware(async (ctx, next) => {
+  let streamController: ReadableStreamDefaultController<SuspenseChunk>;
+  const stream = new ReadableStream<SuspenseChunk>({
+    start(controller) {
+      streamController = controller;
+    },
+  });
+
   const pending = new Set<Promise<string>>();
   ctx.locals.suspend = (promise) => {
     const id = pending.size;
     pending.add(promise);
+    promise.then((chunk) => {
+      pending.delete(promise);
+      streamController.enqueue({ id, chunk });
+      if (pending.size === 0) {
+        streamController.close();
+      }
+    });
     return id;
   };
 
@@ -18,9 +34,9 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
       yield chunk;
     }
 
-    for (const [id, promise] of [...pending].entries()) {
+    for await (const { id, chunk } of stream) {
       yield `
-        <template data-suspense="${id}">${await promise}</template>
+        <template data-suspense="${id}">${chunk}</template>
         <script>
           (() => {
             const template = document.querySelector('template[data-suspense="${id}"]');

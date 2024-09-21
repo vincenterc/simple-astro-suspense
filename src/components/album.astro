@@ -1,0 +1,17 @@
+---
+import { getById } from '../data/data';
+
+type Props = {
+  id: string;
+};
+
+const { id } = Astro.props;
+const a = await getById(id);
+---
+
+<li class="flex gap-2 items-center mb-2">
+  <img src={a?.cover} alt={a?.title} class="w-20 aspect-square" /><div>
+    <h3 class="text-xl">{a?.title}</h3>
+    <p>{a?.songs.length} songs</p>
+  </div>
+</li>
